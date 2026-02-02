@@ -1,0 +1,146 @@
+<
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workshop 101 – Stocktaking</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f6f8; margin:0; padding:15px; }
+    h1 { text-align:center; }
+    .tabs { display:flex; gap:5px; margin-bottom:15px; }
+    .tabs button { flex:1; padding:10px; border:none; border-radius:6px; background:#ccc; }
+    .tabs button.active { background:#0a3d62; color:#fff; }
+    .section { display:none; background:#fff; padding:15px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
+    label { display:block; margin-top:10px; }
+    input, select, button { width:100%; padding:8px; margin-top:5px; }
+    button.primary { background:#0a3d62; color:#fff; border:none; border-radius:5px; margin-top:10px; }
+    button.danger { background:#b71540; color:#fff; border:none; border-radius:5px; }
+    table { width:100%; border-collapse:collapse; margin-top:15px; }
+    th, td { border:1px solid #ccc; padding:6px; font-size:14px; }
+    th { background:#eaeaea; }
+    .count { margin-top:10px; font-weight:bold; }
+    .low { color:red; font-weight:bold; }
+  </style>
+</head>
+<body>
+
+<h1>Workshop 101</h1>
+
+<div class="tabs">
+  <button onclick="showTab('issue')" class="active">Issue</button>
+  <button onclick="showTab('return')">Return</button>
+  <button onclick="showTab('records')">Records</button>
+</div>
+
+<div id="issue" class="section" style="display:block;">
+  <h3>Issue Stock</h3>
+  <label>Category</label>
+  <select id="category">
+    <option>Oil</option>
+    <option>Parts</option>
+    <option>Drills</option>
+    <option>Tools</option>
+  </select>
+
+  <label>Machine Number</label>
+  <input id="machine" />
+
+  <label>Part / Tool Number</label>
+  <input id="part" />
+
+  <label>Issued To</label>
+  <input id="person" />
+
+  <button class="primary" onclick="issueItem()">Issue Item</button>
+</div>
+
+<div id="return" class="section">
+  <h3>Return Stock</h3>
+  <label>Part / Tool Number</label>
+  <input id="returnPart" />
+  <button class="primary" onclick="returnItem()">Return Item</button>
+</div>
+
+<div id="records" class="section">
+  <h3>Inventory Records</h3>
+  <input id="search" placeholder="Search by machine, person or part" onkeyup="render()" />
+  <table>
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th>Machine</th>
+        <th>Part</th>
+        <th>Person</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="count" id="counts"></div>
+  <button class="primary" onclick="exportCSV()">Export to Excel (CSV)</button>
+</div>
+
+<script>
+let data = JSON.parse(localStorage.getItem('workshop101')) || [];
+let openingStock = { Oil:50, Parts:100, Drills:20, Tools:40 };
+let minStock = { Oil:10, Parts:20, Drills:5, Tools:10 };
+
+function showTab(id){
+  document.querySelectorAll('.section').forEach(s=>s.style.display='none');
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).style.display='block';
+  event.target.classList.add('active');
+}
+
+function issueItem(){
+  if(!machine.value || !part.value || !person.value){alert('Fill all fields');return;}
+  data.push({category:category.value,machine:machine.value,part:part.value,person:person.value,status:'Issued'});
+  save();
+}
+
+function returnItem(){
+  const item = data.find(d=>d.part===returnPart.value && d.status==='Issued');
+  if(!item){alert('Item not found or already returned');return;}
+  item.status='Returned';
+  save();
+}
+
+function save(){
+  localStorage.setItem('workshop101',JSON.stringify(data));
+  machine.value=part.value=person.value=returnPart.value='';
+  render();
+}
+
+function render(){
+  rows.innerHTML='';
+  let counts={Oil:0,Parts:0,Drills:0,Tools:0};
+  const q=search.value?.toLowerCase()||'';
+
+  data.filter(d=>JSON.stringify(d).toLowerCase().includes(q)).forEach(d=>{
+    if(d.status==='Issued') counts[d.category]++;
+    rows.innerHTML+=`<tr><td>${d.category}</td><td>${d.machine}</td><td>${d.part}</td><td>${d.person}</td><td>${d.status}</td></tr>`;
+  });
+
+  countsDiv.innerHTML = Object.keys(counts).map(c=>{
+    let balance = openingStock[c]-counts[c];
+    return `${c}: ${balance} ${balance<=minStock[c]?'⚠️ Low':''}`;
+  }).join(' | ');
+}
+
+function exportCSV(){
+  let csv='Category,Machine,Part,Person,Status
+';
+  data.forEach(d=>{csv+=`${d.category},${d.machine},${d.part},${d.person},${d.status}
+`;});
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='Workshop101_Stock.csv';
+  a.click();
+}
+
+render();
+</script>
+
+</body>
+</html>
